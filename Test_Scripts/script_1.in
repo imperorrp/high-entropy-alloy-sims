@@ -1,0 +1,33 @@
+#LAMMPS input script for testing 
+
+# initialize
+units metal
+dimension 3
+boundary p p p
+atom_style atomic
+
+# create a simple FCC lattice
+lattice fcc 3.52
+region box block 0 10 0 10 0 10
+create_box 1 box
+create_atoms 1 box
+
+# define atom types and masses
+atom_modify sort 0 0.0
+mass 1 1.0  # Define mass for atom ty
+
+# define potential
+pair_style eam 
+pair_coeff * * Ni_u3.eam
+
+# define thermodynamic dump parameters
+thermo 100
+thermo_style custom step temp pe
+
+# run simulation
+fix 1 all npt temp 300 300 0.1 iso 0.0 0.0 1000.0 drag 1.0
+timestep 0.001
+
+# Run simulation
+run 1000000 every 1000 "if '$(time)>5' then 'write_data final_configuration.lmp' 'quit' "
+
