@@ -1,0 +1,62 @@
+# LAMMPS input script for PKA radiation damage in pure Nickel at 5 keV
+# establish crystal model, apply 3D PBC, introduce PKA, simulate damage
+
+# initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# specify the number of OpenMP threads
+package omp 4
+
+# read relaxed data file (output from relaxation)
+read_data Ni_relaxed.lmp
+
+# define potential (EAM potential for Nickel)
+pair_style eam
+pair_coeff * * Ni_u3.eam
+
+neighbor	 1 bin
+neigh_modify	 delay 5
+
+# define thermodynamic dump parameters
+reset_timestep 0
+thermo 100
+thermo_style custom time step temp press etotal
+
+# dump settings for atomic configurations
+dump 1 all custom 1000 Ni_pka_5kev_*.dump id type x y z 
+dump_modify 1 sort id
+
+# PKA radiation damage process
+# define PKA properties
+variable pka_energy equal 5.0  # PKA energy in keV
+variable pka_direction_x equal 0  # PKA direction x-component
+variable pka_direction_y equal 0  # PKA direction y-component
+variable pka_direction_z equal 1  # PKA direction z-component
+
+# calculate center of the simulation cell
+variable cell_center_x equal lx/2
+variable cell_center_y equal ly/2
+variable cell_center_z equal lz/2
+
+# define radius for selecting recoil atom 
+variable radius equal 1.0 # This selects exactly one center atom
+
+# pick a random atom near the center as the recoil atom
+region center_sphere sphere ${cell_center_x} ${cell_center_y} ${cell_center_z} ${radius}
+
+# create a group of atoms within the defined region
+group center_atom region center_sphere
+
+# set PKA velocity to 1282 angstroms per picosecond in specified direction (corresponds to 5KeV)
+variable pka_velocity equal 1282.0
+velocity center_atom set 0 0 ${pka_velocity} units box
+
+# relaxation run in NVE ensemble after PKA introduction
+fix 5 all dt/reset 10 0.0001 0.01 0.02 units box
+fix 1 all nve
+
+# write final configuration after PKA simulation and quit simulation after 25 picoseconds
+run 1000000 every 1000 "if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' "
+
