@@ -1,0 +1,4 @@
+# Input script for creating randomly distributed FCC single phase NiCoCrFe HEA crystal structure
+# (Enter in terminal)
+
+atomsk --create fcc 3.61 Ni -duplicate 45 45 45 -select random 50%% Ni -substitute Ni Co -select random 50%% Ni -substitute Ni Cr -select random 50%% Co -substitute Co Fe NiCoCrFe_random.lmp 

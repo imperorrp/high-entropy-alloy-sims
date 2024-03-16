@@ -1,6 +1,0 @@
-# example input script for creating FCC Nickel crystal structure
-# enter in command line
-
-atomsk --create fcc 3.52 Ni -duplicate 45 45 45 Ni_crystal.lmp
-
-

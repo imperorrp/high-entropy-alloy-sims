@@ -1,0 +1,62 @@
+# Tensile Test Simulation in LAMMPS with irradiated + relaxed file as input 
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+
+# Read data file (output from previous steps)
+read_data NiCoCrFe_5KeV_Relaxed.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-heafixed.setfl Ni Co Cr Fe
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define timesteps
+reset_timestep 0
+timestep 0.01
+
+#--------------------------
+# Store final cell length for strain calculations
+variable tmp equal "lx"
+variable L0 equal ${tmp}
+print "Initial Length, L0: ${L0}"
+
+fix 1 all npt temp 300 300 1 x 0 0 1 y 0 0 1 drag 1
+variable srate equal 2.0e9
+variable srate1 equal "v_srate / 1.0e12" # adjusting strain rate unit from per second to per picosecond
+fix 2 all deform 1 z erate ${srate1} units box remap x
+
+# Output strain and stress info to file
+# for units metal, pressure is in [bars] = 100 [kPa] = 1/10000 [GPa]
+# p2, p3, p4 are in GPa
+variable strain equal "(lz - v_L0)/v_L0"
+variable p1 equal "v_strain"
+variable p2 equal "-pxx/10000"
+variable p3 equal "-pyy/10000"
+variable p4 equal "-pzz/10000"
+fix def1 all print 10 "${p1} ${p2} ${p3} ${p4}" file NiCoCrFe_Tensile_5KeV.def1.txt screen no
+
+# dumping data
+dump 1 all custom 1000 dump.NiCoCrFe_Tensile_5KeV_*.dump id type x y z
+dump_modify 1 sort id
+
+# Display thermo
+thermo 100
+thermo_style custom time step v_strain temp v_p2 v_p3 v_p4 ke pe press
+
+# run tensile test for 100 ps
+run 10000
+
+# write output data
+write_data NiCoCrFe_5KeV_Strained.lmp 
+
+# end of simulation
+print "Tensile test simulation completed."
+

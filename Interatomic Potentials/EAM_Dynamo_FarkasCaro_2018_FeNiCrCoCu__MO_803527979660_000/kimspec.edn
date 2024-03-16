@@ -1,0 +1,37 @@
+{"content-origin" "https://www.ctcms.nist.gov/potentials/entry/2018--Farkas-D-Caro-A--Fe-Ni-Cr-Co-Cu/"
+ "contributor-id" "4ad03136-ed7f-4316-b586-1e94ccceb311"
+ "description" "This is a set of embedded atom method model interatomic potentials capable of representing a high-entropy alloy with five components. The set is developed to resemble but not model precisely face-centered cubic (fcc) near-equiatomic mixtures of Fe–Ni–Cr–Co–Cu. The individual components have atomic sizes deviating up to 3%. With the heats of mixing of all binary equiatomic random fcc mixtures being less than 0.7 kJ/mol and the corresponding value for the quinary being −0.0002 kJ/mol, the potentials predict the random equiatomic fcc quinary mixture to be stable with respect to phase separation or ordering and with respect to bcc and hcp random mixtures."
+ "developer" ["334e0d1f-993e-4ccc-8bd7-3abc2847ce45"
+              "01159d13-6faf-42c0-b839-0967d2d36ea1"]
+ "doi" "10.25950/8c2ffcf6"
+ "domain" "openkim.org"
+ "executables" []
+ "extended-id" "EAM_Dynamo_FarkasCaro_2018_FeNiCrCoCu__MO_803527979660_000"
+ "funding" [{"award-number" "1507846"
+             "funder-identifier" "https://doi.org/10.13039/100000078"
+             "funder-identifier-type" "Crossref Funder ID"
+             "funder-name" "Division of Materials Research"
+             "scheme-uri" "http://doi.org/"}]
+ "kim-api-version" "2.2"
+ "maintainer-id" "4ad03136-ed7f-4316-b586-1e94ccceb311"
+ "model-driver" "EAM_Dynamo__MD_120291908751_005"
+ "potential-type" "eam"
+ "publication-year" "2022"
+ "source-citations" [{"abstract" "A set of embedded atom method model interatomic potentials is presented to represent a high-entropy alloy with five components. The set is developed to resemble but not model precisely face-centered cubic (fcc) near-equiatomic mixtures of Fe--Ni--Cr--Co--Cu. The individual components have atomic sizes deviating up to 3{\\%}. With the heats of mixing of all binary equiatomic random fcc mixtures being less than 0.7 kJ/mol and the corresponding value for the quinary being −0.0002 kJ/mol, the potentials predict the random equiatomic fcc quinary mixture to be stable with respect to phase separation or ordering and with respect to bcc and hcp random mixtures. The details of lattice distortion, strain, and stress states in this phase are reported. The standard deviation in the individual nearest neighbor bond lengths was found to be in the range of 2{\\%}. Most importantly, individual atoms in the alloy were found to be under atomic strains up to 0.5{\\%}, corresponding to individual atomic stresses up to several GPa."
+                      "author" "Farkas, Diana and Caro, Alfredo"
+                      "day" "01"
+                      "doi" "10.1557/jmr.2018.245"
+                      "issn" "2044-5326"
+                      "journal" "Journal of Materials Research"
+                      "month" "oct"
+                      "number" "19"
+                      "pages" "3218-3225"
+                      "recordkey" "MO_803527979660_000a"
+                      "recordprimary" "recordprimary"
+                      "recordtype" "article"
+                      "title" "Model interatomic potentials and lattice strain in a high-entropy alloy"
+                      "url" "https://doi.org/10.1557/jmr.2018.245"
+                      "volume" "33"
+                      "year" "2018"}]
+ "species" ["Fe" "Ni" "Cr" "Co" "Cu"]
+ "title" "EAM potential (LAMMPS cubic hermite tabulation) for the Fe-Ni-Cr-Co-Cu system developed by Farkas and Caro (2018) v000"}
