@@ -1,0 +1,60 @@
+LAMMPS (2 Aug 2023 - Update 2)
+  using 4 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\Ratish Panda\AppData\Local\LAMMPS 64-bit 2Aug2023\plugins
+# LAMMPS input script for relaxation of FCC Nickel crystal with 3D PBC and NPT ensemble
+# Includes periodic dumping of atomic configurations
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Read data file
+read_data Ni_crystal.lmp
+Reading data file ...
+  orthogonal box = (0 0 0) to (158.4 158.4 158.4)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  364500 atoms
+  read_data CPU = 1.026 seconds
+
+# Define potential (EAM potential for Nickel)
+pair_style eam
+pair_coeff * * Ni_u3.eam
+Reading eam potential file Ni_u3.eam with DATE: 2007-06-11
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.001
+thermo 100
+thermo_style custom step temp press etotal
+
+# Dump settings for atomic configurations
+dump 1 all custom 1000 Ni_relaxed_*.dump id type x y z vx vy vz fx fy fz
+dump_modify 1 sort id
+
+# Relaxation run in NPT ensemble for 100 ps
+fix 1 all npt temp 300 300 0.1 iso 0.0 0.0 1000.0 drag 1.0
+run 100000
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.8
+  ghost atom cutoff = 6.8
+  binsize = 3.4, bins = 47 47 47
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 224 | 224 | 224 Mbytes
+   Step          Temp          Press          TotEng    
+         0   0             -0.12038609    -1622025      
+       100   1.8033373e-21 -0.12038524    -1622025      
+       200   2.8931489e-21 -0.12038268    -1622025      
+       300   3.3434446e-21 -0.12037838    -1622025      
+       400   4.9930565e-21 -0.12037236    -1622025      
+       500   6.4676564e-21 -0.12036464    -1622025      
+       600   7.5950383e-21 -0.12035521    -1622025      
+       700   8.371576e-21  -0.12034407    -1622025      

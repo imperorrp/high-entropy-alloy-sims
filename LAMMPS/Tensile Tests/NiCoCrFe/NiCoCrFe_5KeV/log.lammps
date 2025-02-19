@@ -1,0 +1,105 @@
+LAMMPS (2 Aug 2023 - Update 2)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\Ratish Panda\AppData\Local\LAMMPS 64-bit 2Aug2023-MSMPI with Python\plugins
+# Tensile Test Simulation in LAMMPS
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+set 4 OpenMP thread(s) per MPI task
+using multi-threaded neighbor list subroutines
+
+# Read data file (output from previous steps)
+read_data NiCoCrFe_pka_5keV_final.lmp
+Reading data file ...
+  orthogonal box = (0.80381162 0.80381162 0.80381162) to (161.64619 161.64619 161.64619)
+  2 by 1 by 2 MPI processor grid
+  reading atoms ...
+  364500 atoms
+  reading velocities ...
+  364500 velocities
+  read_data CPU = 4.802 seconds
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-heafixed.setfl Ni Co Cr Fe
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.01
+fix 1 all npt temp 300 300 1 iso 0 0 1 drag 1
+thermo 100
+thermo_style custom step temp press etotal
+
+# Relaxation for 20 ps
+run 2000
+No /omp style for force computation currently active
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.80375
+  ghost atom cutoff = 6.80375
+  binsize = 3.401875, bins = 48 48 48
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam/alloy, perpetual
+      attributes: half, newton on, omp
+      pair build: half/bin/atomonly/newton/omp
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 63.85 | 64.24 | 65 Mbytes
+   Step          Temp          Press          TotEng    
+         0   364.22939     -26334.117     -1554633.7    
+       100   361.69723      46.997963     -1555621.4    
+       200   355.11367      67.986322     -1556245.9    
+       300   349.7387      -29.819119     -1556822.4    
+       400   343.9549       144.61289     -1557346.2    
+       500   338.69757      74.085964     -1557824.4    
+       600   334.27928      141.13118     -1558259.4    
+       700   329.55399     -31.62363      -1558655.5    
+       800   326.48715      144.46951     -1559016.4    
+       900   322.50402      155.85187     -1559342.1    
+      1000   320.60036      166.11947     -1559639.6    
+      1100   316.85717      103.5639      -1559904.4    
+      1200   314.53904      24.265846     -1560142.4    
+      1300   312.40452     -270.80629     -1560355.1    
+      1400   310.84383     -163.63197     -1560546.9    
+      1500   309.16229     -162.67471     -1560713.4    
+      1600   307.42243     -117.59443     -1560862.6    
+      1700   305.73633      130.44277     -1560989.4    
+      1800   304.06506      177.97987     -1561100.2    
+      1900   303.84135     -368.60431     -1561197.8    
+      2000   303.45411     -44.562928     -1561278.5    
+Loop time of 843.007 on 16 procs for 2000 steps with 364500 atoms
+
+Performance: 2.050 ns/day, 11.708 hours/ns, 2.372 timesteps/s, 864.762 katom-step/s
+101.1% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 709.82     | 714.36     | 717.79     |  12.0 | 84.74
+Neigh   | 52.954     | 53.378     | 53.602     |   3.5 |  6.33
+Comm    | 27.828     | 31.377     | 35.805     |  59.7 |  3.72
+Output  | 0.01788    | 0.018163   | 0.018471   |   0.2 |  0.00
+Modify  | 40.076     | 40.226     | 40.372     |   1.9 |  4.77
+Other   |            | 3.652      |            |       |  0.43
+
+Nlocal:          91125 ave       91321 max       90933 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:        40047.5 ave       40237 max       39855 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Neighs:    6.01028e+06 ave 6.04731e+06 max 5.97598e+06 min
+Histogram: 1 0 0 1 0 1 0 0 0 1
+
+Total # of neighbors = 24041119
+Ave neighs/atom = 65.956431
+Neighbor list builds = 373
+Dangerous builds = 0

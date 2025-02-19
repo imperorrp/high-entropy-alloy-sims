@@ -1,0 +1,28 @@
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Read data file
+read_data NiCoCrFe_random.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-heafixed.setfl Ni Co Cr Fe 
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.01
+thermo 100
+thermo_style custom time step temp ke pe press etotal
+
+# Dump settings for atomic configurations
+dump 1 all custom 1000 NiCoCrFe_relaxed_*.dump id type x y z 
+dump_modify 1 sort id
+
+# Relaxation run in NPT ensemble for 100 ps
+fix 1 all npt temp 300 300 0.1 iso 0.0 0.0 1000.0 drag 1.0
+run 10000
+
+# Write relaxed structure
+write_data NiCoCrFe_relaxed.lmp

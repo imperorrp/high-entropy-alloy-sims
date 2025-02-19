@@ -1,0 +1,1 @@
+Run custom_NiCoCrFeCu_generation.in to generate a custom NiCoCrFeCu crystal lattice (Enter element %ages in the variables section at the start of the script)

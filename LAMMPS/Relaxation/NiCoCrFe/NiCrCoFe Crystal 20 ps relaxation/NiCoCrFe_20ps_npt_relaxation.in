@@ -1,0 +1,32 @@
+# 20 ps relaxation (In the same NPT ensemble parameters as the post-irradiation relaxation)
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+
+# Read data file (output from previous steps)
+read_data NiCoCrFe_relaxed.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-heafixed.setfl Ni Co Cr Fe 
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.01
+fix 1 all npt temp 300 300 0.8 iso 0 0 1 drag 1 
+thermo 100
+thermo_style custom time step temp press etotal
+
+# Relaxation for 20 ps
+run 2000
+
+# write output data
+write_data NiCoCrFe_Unirradiated_20ps_Relaxed.lmp 

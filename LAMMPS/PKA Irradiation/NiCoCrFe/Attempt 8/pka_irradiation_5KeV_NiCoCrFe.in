@@ -1,0 +1,90 @@
+# LAMMPS input script for PKA radiation damage in NiCoCrFe at 5 keV
+# Establish crystal model, apply 3D PBC, introduce PKA, simulate damage
+# Uses 2021 ZBL-splined potential
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+
+# Read relaxed data file (output from relaxation)
+read_data NiCoCrFe_relaxed.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-with-ZBL.eam.alloy Ni Co Cr Fe 
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define thermodynamic dump parameters
+reset_timestep 0
+thermo 100
+thermo_style custom time step temp press etotal
+
+# Apply 3D periodic boundary conditions (already applied by 'read_data')
+# No need for create_box or create_atoms
+
+# Dump settings for atomic configurations (optional)
+# Use if you want to visualize the simulation progress
+dump 1 all custom 1000 NiCoCrFe_pka_5kev_*.dump id type x y z 
+dump_modify 1 sort id
+
+# PKA radiation damage process
+# Define PKA properties
+variable pka_energy equal 5.0  # PKA energy in keV
+variable pka_direction_x equal 0  # PKA direction x-component
+variable pka_direction_y equal 0  # PKA direction y-component
+variable pka_direction_z equal 1  # PKA direction z-component
+
+# Calculate center of the simulation cell
+variable cell_center_x equal lx/2
+variable cell_center_y equal ly/2
+variable cell_center_z equal lz/2
+
+# Define radius for selecting recoil atom 
+variable radius equal 5.0 # This encompasses a bunch of central atoms - at least one should be an Fe atom
+
+# Pick a random atom near the center as the recoil atom
+region center_sphere sphere ${cell_center_x} ${cell_center_y} ${cell_center_z} ${radius}
+
+# Create a group of atoms within the defined center region
+group center_atoms region center_sphere
+
+# Create a group of Fe atoms 
+group fe_atoms type 2 # type 2 is Fe
+
+# PKA velocity is determined by mass of Fe atom, which is selected as PKA atom
+# Set PKA velocity to 1314 angstroms per picosecond in specified direction
+variable pka_velocity equal 1314.0
+
+region select sphere ${cell_center_x} ${cell_center_y} ${cell_center_z} ${radius}
+group select empty 
+variable inside equal count(select,select) #there should not be any empty space between select and select (very hard to debug)
+variable n loop 400000 # set to 400000, more than number of atoms in sim cell
+
+label jump 
+variable select index $(random(1,atoms,364500):%.0f)
+group select id ${select}
+if "${inside} == 0" then & 
+    "group select delete" &
+    "variable select delete" & 
+    "next n" &
+    "jump SELF jump"
+
+# Setting PKA atom and velocity to selected atom ID within center region
+group pka_atom id ${select}
+print "selected PKA Atom ID is: ${select}"
+variable pka_velocity equal 1314.0 
+velocity pka_atom set 0 0 ${pka_velocity} units box 
+
+# Relaxation run in NVE ensemble after PKA introduction
+fix 5 all dt/reset 10 0.0001 0.01 0.02 units box
+fix 1 all nve
+
+# Write final configuration after PKA simulation and quit simulation after 25 picoseconds
+run 1000000 every 1000 "if '$(time)>25' then 'write_data NiCoCrFe_pka_5keV_final.lmp' 'quit' "
+

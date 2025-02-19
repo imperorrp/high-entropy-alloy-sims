@@ -1,0 +1,1 @@
+Note: Only ZBL-potential tensile test lmp files are important 

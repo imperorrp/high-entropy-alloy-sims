@@ -1,0 +1,675 @@
+LAMMPS (2 Aug 2023 - Update 2)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\Ratish Panda\AppData\Local\LAMMPS 64-bit 2Aug2023-MSMPI with Python\plugins
+# LAMMPS input script for PKA radiation damage in pure Nickel at 5 keV
+# Establish crystal model, apply 3D PBC, introduce PKA, simulate damage
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+set 4 OpenMP thread(s) per MPI task
+using multi-threaded neighbor list subroutines
+
+# Read relaxed data file (output from relaxation)
+read_data Ni_relaxed.lmp
+Reading data file ...
+  orthogonal box = (-0.013463769 -0.013463769 -0.013463769) to (158.41346 158.41346 158.41346)
+  1 by 2 by 2 MPI processor grid
+  reading atoms ...
+  364500 atoms
+  reading velocities ...
+  364500 velocities
+  read_data CPU = 4.083 seconds
+
+# Define potential (EAM potential for FeNiCrCoCu)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-with-ZBL.eam.alloy Ni
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define thermodynamic dump parameters
+reset_timestep 0
+thermo 100
+thermo_style custom time step temp press etotal
+
+# Apply 3D periodic boundary conditions (already applied by 'read_data')
+# No need for create_box or create_atoms
+
+# Dump settings for atomic configurations (optional)
+# Use if you want to visualize the simulation progress
+dump 1 all custom 1000 Ni_pka_5kev_*.dump id type x y z
+dump_modify 1 sort id
+
+# PKA radiation damage process
+# Define PKA properties
+variable pka_energy equal 5.0  # PKA energy in keV
+variable pka_direction_x equal 0  # PKA direction x-component
+variable pka_direction_y equal 0  # PKA direction y-component
+variable pka_direction_z equal 1  # PKA direction z-component
+
+# Calculate center of the simulation cell
+variable cell_center_x equal lx/2
+variable cell_center_y equal ly/2
+variable cell_center_z equal lz/2
+
+# Define radius for selecting recoil atom
+variable radius equal 1.0 # This selects exactly one center atom
+
+# Pick a random atom near the center as the recoil atom
+region center_sphere sphere ${cell_center_x} ${cell_center_y} ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 ${cell_center_y} ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 79.2134637691141 ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 79.2134637691141 1
+
+# Create a group of atoms within the defined region
+group center_atom region center_sphere
+1 atoms in group center_atom
+
+# Set PKA velocity to 1282 angstroms per picosecond in specified direction
+variable pka_velocity equal 1282.0
+velocity center_atom set 0 0 ${pka_velocity} units box
+velocity center_atom set 0 0 1282 units box
+
+# Relaxation run in NVE ensemble after PKA introduction
+fix 5 all dt/reset 10 0.0001 0.01 0.02 units box
+fix 1 all nve
+
+# Write final configuration after PKA simulation and quit simulation after 25 picoseconds
+run 1000000 every 1000 "if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' "
+No /omp style for force computation currently active
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.80375
+  ghost atom cutoff = 6.80375
+  binsize = 3.401875, bins = 47 47 47
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam/alloy, perpetual
+      attributes: half, newton on, omp
+      pair build: half/bin/atomonly/newton/omp
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 65.68 | 65.68 | 65.68 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 0                      0   406.05876      4215.3702     -1602892.5    
+ 0.01                 100   403.13323      4243.83       -1602892      
+ 0.02                 200   404.00158      4269.7642     -1602892.2    
+ 0.03                 300   401.63445      4316.014      -1602892.4    
+ 0.04                 400   396.42536      4414.2617     -1602892.2    
+ 0.05                 500   393.51541      4522.0983     -1602892.1    
+ 0.06                 600   389.29158      4635.7385     -1602892.2    
+ 0.07                 700   386.96734      4698.338      -1602892.1    
+ 0.08                 800   381.1268       4891.8599     -1602892.1    
+ 0.09                 900   372.87102      5072.7241     -1602892.4    
+ 0.1                 1000   370.54955      5210.4822     -1602892.1    
+Loop time of 243.834 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.035 ns/day, 677.317 hours/ns, 4.101 timesteps/s, 1.495 Matom-step/s
+97.5% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 204.2      | 204.66     | 205.28     |   3.1 | 83.93
+Neigh   | 13.059     | 13.126     | 13.161     |   1.1 |  5.38
+Comm    | 14.441     | 14.938     | 15.388     |   9.7 |  6.13
+Output  | 0.25483    | 0.27754    | 0.30076    |   3.2 |  0.11
+Modify  | 9.0447     | 9.0963     | 9.1656     |   1.5 |  3.73
+Other   |            | 1.737      |            |       |  0.71
+
+Nlocal:          91125 ave       91125 max       91125 min
+Histogram: 4 0 0 0 0 0 0 0 0 0
+Nghost:        46505.5 ave       46515 max       46482 min
+Histogram: 1 0 0 0 0 0 0 0 0 3
+Neighs:    6.10371e+06 ave 6.10536e+06 max 6.10075e+06 min
+Histogram: 1 0 0 0 0 1 0 0 0 2
+
+Total # of neighbors = 24414846
+Ave neighs/atom = 66.981745
+Neighbor list builds = 142
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.47 | 80.91 | 81.08 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 0.1                 1000   370.54955      5210.4822     -1602892.1    
+ 0.11                1100   366.64246      5379.2575     -1602892.1    
+ 0.12                1200   363.48991      5543.4855     -1602892.1    
+ 0.13                1300   358.00243      5770.6917     -1602892.1    
+ 0.14030818          1400   354.4517       5960.8483     -1602892.1    
+ 0.15318541          1500   350.54993      6208.7406     -1602892.1    
+ 0.17016346          1600   346.14498      6533.8019     -1602892.1    
+ 0.19225106          1700   343.19592      6844.2061     -1602892.1    
+ 0.22530465          1800   341.38719      7119.854      -1602892      
+ 0.26739144          1900   342.21091      7205.0265     -1602892      
+ 0.32367005          2000   343.99783      7037.508      -1602892      
+Loop time of 212.782 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.281 ns/day, 85.446 hours/ns, 4.700 timesteps/s, 1.713 Matom-step/s
+99.5% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 188.54     | 189.87     | 191.22     |   7.2 | 89.23
+Neigh   | 4.3191     | 4.3729     | 4.4186     |   1.7 |  2.06
+Comm    | 5.8612     | 7.264      | 8.61       |  37.6 |  3.41
+Output  | 0.28726    | 0.31051    | 0.33547    |   3.2 |  0.15
+Modify  | 9.4221     | 9.4523     | 9.4783     |   0.8 |  4.44
+Other   |            | 1.51       |            |       |  0.71
+
+Nlocal:          91125 ave       91137 max       91107 min
+Histogram: 1 0 0 0 0 0 1 1 0 1
+Nghost:        46504.5 ave       46517 max       46483 min
+Histogram: 1 0 0 0 0 0 0 1 1 1
+Neighs:    6.08986e+06 ave 6.10538e+06 max 6.06319e+06 min
+Histogram: 1 0 0 0 0 1 0 0 0 2
+
+Total # of neighbors = 24359458
+Ave neighs/atom = 66.829789
+Neighbor list builds = 46
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.47 | 80.91 | 81.08 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 0.32367005          2000   343.99783      7037.508      -1602892      
+ 0.39173581          2100   346.12201      6830.7896     -1602892.1    
+ 0.46315483          2200   346.39126      6736.5349     -1602892.1    
+ 0.5349509           2300   347.06704      6670.7242     -1602892.1    
+ 0.61030655          2400   347.86586      6608.0977     -1602892.1    
+ 0.68226383          2500   348.90269      6523.9796     -1602892.1    
+ 0.75230257          2600   349.17457      6496.9857     -1602892.1    
+ 0.83553069          2700   349.67581      6462.9252     -1602892.1    
+ 0.91719996          2800   350.39981      6416.613      -1602892.1    
+ 0.99822552          2900   350.80138      6412.9364     -1602892.1    
+ 1.085336            3000   350.93498      6410.0567     -1602892.1    
+Loop time of 227.142 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.358 ns/day, 67.130 hours/ns, 4.403 timesteps/s, 1.605 Matom-step/s
+97.9% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 199.44     | 202.3      | 206.39     |  20.8 | 89.06
+Neigh   | 3.8316     | 3.9544     | 4.0484     |   4.5 |  1.74
+Comm    | 5.498      | 9.6872     | 12.611     |  98.0 |  4.26
+Output  | 0.25644    | 0.28047    | 0.30538    |   3.5 |  0.12
+Modify  | 9.3659     | 9.4073     | 9.4619     |   1.2 |  4.14
+Other   |            | 1.516      |            |       |  0.67
+
+Nlocal:          91125 ave       91501 max       90748 min
+Histogram: 1 0 0 0 1 1 0 0 0 1
+Nghost:        43920.5 ave       44303 max       43540 min
+Histogram: 1 0 0 0 1 1 0 0 0 1
+Neighs:    6.09687e+06 ave 6.11876e+06 max 6.05837e+06 min
+Histogram: 1 0 0 0 0 0 0 2 0 1
+
+Total # of neighbors = 24387480
+Ave neighs/atom = 66.906667
+Neighbor list builds = 38
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 80.93 | 81.1 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 1.085336            3000   350.93498      6410.0567     -1602892.1    
+ 1.1593124           3100   351.32515      6405.335      -1602892.1    
+ 1.24157             3200   351.48129      6402.3069     -1602892.1    
+ 1.33179             3300   351.46561      6416.7683     -1602892.1    
+ 1.429101            3400   351.6271       6427.6736     -1602892.1    
+ 1.5230686           3500   352.15902      6410.3143     -1602892.1    
+ 1.6096279           3600   351.46053      6482.4244     -1602892.1    
+ 1.7139295           3700   351.59288      6564.2875     -1602892.1    
+ 1.8300895           3800   352.3276       6627.4316     -1602892.1    
+ 1.9468099           3900   352.58219      6643.7641     -1602892.1    
+ 2.0683349           4000   352.53511      6674.1267     -1602892.1    
+Loop time of 233.41 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.344 ns/day, 69.757 hours/ns, 4.284 timesteps/s, 1.562 Matom-step/s
+99.0% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 208.41     | 210.34     | 212.09     |  11.5 | 90.11
+Neigh   | 4.0339     | 4.0716     | 4.0962     |   1.2 |  1.74
+Comm    | 6.0441     | 7.8302     | 9.7577     |  60.7 |  3.35
+Output  | 0.27368    | 0.29782    | 0.32346    |   3.4 |  0.13
+Modify  | 9.3292     | 9.3782     | 9.4221     |   1.2 |  4.02
+Other   |            | 1.495      |            |       |  0.64
+
+Nlocal:          91125 ave       91267 max       90985 min
+Histogram: 1 0 1 0 0 0 1 0 0 1
+Nghost:        44111.8 ave       44357 max       43974 min
+Histogram: 1 0 2 0 0 0 0 0 0 1
+Neighs:      6.103e+06 ave 6.11367e+06 max 6.09274e+06 min
+Histogram: 1 1 0 0 0 0 0 1 0 1
+
+Total # of neighbors = 24411991
+Ave neighs/atom = 66.973912
+Neighbor list builds = 37
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 80.93 | 81.1 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 2.0683349           4000   352.53511      6674.1267     -1602892.1    
+ 2.1852681           4100   352.7343       6700.0446     -1602892.1    
+ 2.3129354           4200   352.69321      6736.4629     -1602892.1    
+ 2.4406199           4300   352.46961      6820.427      -1602892.1    
+ 2.5876364           4400   352.26932      6914.6362     -1602892.1    
+ 2.7372949           4500   352.05341      6972.0734     -1602892      
+ 2.8949643           4600   351.79599      6981.6933     -1602892      
+ 3.0579952           4700   352.25418      7016.9051     -1602892      
+ 3.2297266           4800   353.16045      7062.8935     -1602892      
+ 3.3944957           4900   352.44253      7037.958      -1602892      
+ 3.5661568           5000   351.56907      7006.8215     -1602892      
+Loop time of 235.286 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.638 ns/day, 37.598 hours/ns, 4.250 timesteps/s, 1.549 Matom-step/s
+98.7% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 209.69     | 212.11     | 215.12     |  15.5 | 90.15
+Neigh   | 3.7906     | 3.8399     | 3.8814     |   1.7 |  1.63
+Comm    | 5.1994     | 8.2468     | 10.742     |  80.2 |  3.51
+Output  | 0.24029    | 0.26571    | 0.29088    |   3.7 |  0.11
+Modify  | 9.2997     | 9.3384     | 9.4201     |   1.6 |  3.97
+Other   |            | 1.489      |            |       |  0.63
+
+Nlocal:          91125 ave       91129 max       91120 min
+Histogram: 1 0 0 0 0 1 1 0 0 1
+Nghost:        45969.5 ave       46056 max       45838 min
+Histogram: 1 0 0 0 0 0 1 0 1 1
+Neighs:    6.10455e+06 ave 6.10547e+06 max 6.10249e+06 min
+Histogram: 1 0 0 0 0 0 0 0 1 2
+
+Total # of neighbors = 24418194
+Ave neighs/atom = 66.99093
+Neighbor list builds = 34
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 80.93 | 81.1 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 3.5661568           5000   351.56907      7006.8215     -1602892      
+ 3.7463453           5100   352.63672      6963.9027     -1602892      
+ 3.9391283           5200   352.43151      6903.6695     -1602892      
+ 4.1331972           5300   351.76924      6851.8449     -1602892      
+ 4.331671            5400   351.58243      6852.8813     -1602892      
+ 4.5341189           5500   351.86002      6883.7427     -1602892      
+ 4.7494149           5600   352.24395      6962.9161     -1602892      
+ 4.9593194           5700   352.81221      7075.9695     -1602892      
+ 5.1814559           5800   352.26618      7153.6409     -1602892      
+ 5.409022            5900   352.28216      7149.6793     -1602892      
+ 5.636811            6000   351.94944      7171.0417     -1602892      
+Loop time of 242.958 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.846 ns/day, 28.363 hours/ns, 4.116 timesteps/s, 1.500 Matom-step/s
+99.1% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 219.48     | 220.61     | 222.18     |   6.7 | 90.80
+Neigh   | 3.7701     | 3.7957     | 3.8606     |   1.9 |  1.56
+Comm    | 5.7816     | 7.34       | 8.4877     |  36.3 |  3.02
+Output  | 0.24874    | 0.27231    | 0.29598    |   3.4 |  0.11
+Modify  | 9.4219     | 9.4502     | 9.475      |   0.6 |  3.89
+Other   |            | 1.489      |            |       |  0.61
+
+Nlocal:          91125 ave       91126 max       91124 min
+Histogram: 1 0 0 0 0 2 0 0 0 1
+Nghost:        45455.8 ave       45765 max       45151 min
+Histogram: 1 1 0 0 0 0 0 0 1 1
+Neighs:    6.10476e+06 ave  6.1053e+06 max 6.10348e+06 min
+Histogram: 1 0 0 0 0 0 0 0 1 2
+
+Total # of neighbors = 24419052
+Ave neighs/atom = 66.993284
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 80.93 | 81.1 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 5.636811            6000   351.94944      7171.0417     -1602892      
+ 5.8657783           6100   352.32408      7149.7252     -1602892      
+ 6.0987265           6200   352.12782      7151.1122     -1602892      
+ 6.3279492           6300   351.86516      7160.5099     -1602892      
+ 6.5649234           6400   352.79006      7167.7672     -1602892      
+ 6.798397            6500   352.47324      7128.834      -1602892      
+ 7.0329889           6600   350.84671      7068.6923     -1602892      
+ 7.2738268           6700   351.9987       7081.0011     -1602892      
+ 7.5111172           6800   352.31619      7150.3508     -1602892      
+ 7.7558829           6900   352.22504      7179.3709     -1602892      
+ 8.0021876           7000   352.23363      7227.902      -1602892      
+Loop time of 245.894 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.840 ns/day, 28.582 hours/ns, 4.067 timesteps/s, 1.482 Matom-step/s
+98.8% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 222.88     | 223.43     | 224.77     |   5.2 | 90.87
+Neigh   | 3.7753     | 3.8273     | 3.8913     |   2.1 |  1.56
+Comm    | 6.056      | 7.4035     | 7.9799     |  28.7 |  3.01
+Output  | 0.24469    | 0.26824    | 0.29142    |   3.4 |  0.11
+Modify  | 9.455      | 9.4707     | 9.4798     |   0.3 |  3.85
+Other   |            | 1.491      |            |       |  0.61
+
+Nlocal:          91125 ave       91157 max       91093 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:        42910.2 ave       43189 max       42725 min
+Histogram: 1 0 1 1 0 0 0 0 0 1
+Neighs:     6.1046e+06 ave 6.10742e+06 max 6.10079e+06 min
+Histogram: 1 0 0 1 0 0 0 0 0 2
+
+Total # of neighbors = 24418406
+Ave neighs/atom = 66.991512
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 81.22 | 82.18 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 8.0021876           7000   352.23363      7227.902      -1602892      
+ 8.2500999           7100   352.19166      7220.7802     -1602892      
+ 8.4967237           7200   352.16699      7213.665      -1602892      
+ 8.7494957           7300   351.59164      7197.7067     -1602892      
+ 9.0039788           7400   352.06997      7254.5937     -1602892      
+ 9.250125            7500   352.52998      7220.177      -1602892      
+ 9.4993026           7600   352.47868      7222.3802     -1602892      
+ 9.7475396           7700   351.10388      7191.1892     -1602892      
+ 9.9987861           7800   352.36077      7173.61       -1602892      
+ 10.253256           7900   352.21448      7190.0034     -1602892      
+ 10.505827           8000   351.94856      7246.4306     -1602892      
+Loop time of 248.738 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.886 ns/day, 27.095 hours/ns, 4.020 timesteps/s, 1.465 Matom-step/s
+98.4% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 224.28     | 225.8      | 226.49     |   5.9 | 90.78
+Neigh   | 3.7859     | 3.8438     | 3.8841     |   1.9 |  1.55
+Comm    | 7.1507     | 7.8361     | 9.3222     |  31.0 |  3.15
+Output  | 0.24028    | 0.26404    | 0.28742    |   3.4 |  0.11
+Modify  | 9.4786     | 9.4847     | 9.4949     |   0.2 |  3.81
+Other   |            | 1.514      |            |       |  0.61
+
+Nlocal:          91125 ave       91127 max       91124 min
+Histogram: 2 0 0 1 0 0 0 0 0 1
+Nghost:        44707.5 ave       45507 max       44057 min
+Histogram: 2 0 0 0 0 0 0 1 0 1
+Neighs:    6.10463e+06 ave 6.10531e+06 max 6.10263e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 3
+
+Total # of neighbors = 24418519
+Ave neighs/atom = 66.991822
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.49 | 81.22 | 82.19 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 10.505827           8000   351.94856      7246.4306     -1602892      
+ 10.761613           8100   352.62562      7236.135      -1602892      
+ 11.014719           8200   351.86628      7248.701      -1602892      
+ 11.267064           8300   352.56124      7247.8309     -1602892      
+ 11.520794           8400   351.66579      7224.5776     -1602892      
+ 11.778784           8500   352.25811      7245.3601     -1602892      
+ 12.030879           8600   352.45111      7282.7504     -1602892      
+ 12.290722           8700   352.09508      7259.4482     -1602892.1    
+ 12.543928           8800   352.39626      7277.4911     -1602892.1    
+ 12.802794           8900   352.30473      7244.9662     -1602892      
+ 13.05767            9000   351.97301      7218.7626     -1602892      
+Loop time of 242.015 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.876 ns/day, 27.388 hours/ns, 4.132 timesteps/s, 1.506 Matom-step/s
+98.9% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 219.34     | 219.89     | 220.36     |   2.8 | 90.86
+Neigh   | 3.7377     | 3.8094     | 3.8679     |   3.0 |  1.57
+Comm    | 6.689      | 7.2302     | 7.7429     |  15.4 |  2.99
+Output  | 0.24431    | 0.26951    | 0.29459    |   3.6 |  0.11
+Modify  | 9.2985     | 9.3224     | 9.3508     |   0.7 |  3.85
+Other   |            | 1.491      |            |       |  0.62
+
+Nlocal:          91125 ave       92248 max       90002 min
+Histogram: 1 1 0 0 0 0 0 0 1 1
+Nghost:        42542.5 ave       43666 max       41421 min
+Histogram: 1 1 0 0 0 0 0 0 1 1
+Neighs:    6.10454e+06 ave 6.17748e+06 max 6.02978e+06 min
+Histogram: 1 1 0 0 0 0 0 0 1 1
+
+Total # of neighbors = 24418148
+Ave neighs/atom = 66.990804
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.52 | 81.35 | 82.24 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 13.05767            9000   351.97301      7218.7626     -1602892      
+ 13.315061           9100   351.73753      7243.8346     -1602892      
+ 13.569074           9200   352.98918      7295.8288     -1602892      
+ 13.821858           9300   352.65039      7281.5835     -1602892      
+ 14.080325           9400   351.68328      7266.939      -1602892      
+ 14.33268            9500   351.84056      7264.2786     -1602892      
+ 14.587436           9600   352.15127      7296.8703     -1602892.1    
+ 14.845488           9700   352.55111      7293.6145     -1602892      
+ 15.104438           9800   351.73622      7300.8378     -1602892      
+ 15.360603           9900   352.47929      7277.9498     -1602892      
+ 15.615176          10000   351.8506       7261.1738     -1602892      
+Loop time of 243.541 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.910 ns/day, 26.362 hours/ns, 4.106 timesteps/s, 1.497 Matom-step/s
+99.0% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 220.83     | 221.53     | 222.61     |   4.8 | 90.96
+Neigh   | 3.7562     | 3.8029     | 3.8315     |   1.5 |  1.56
+Comm    | 5.8596     | 6.948      | 7.6311     |  27.5 |  2.85
+Output  | 0.26021    | 0.29365    | 0.34193    |   5.6 |  0.12
+Modify  | 9.4277     | 9.4482     | 9.4568     |   0.4 |  3.88
+Other   |            | 1.518      |            |       |  0.62
+
+Nlocal:          91125 ave       91949 max       90301 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:        43912.8 ave       44743 max       43096 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Neighs:    6.10456e+06 ave 6.16316e+06 max 6.04734e+06 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 24418243
+Ave neighs/atom = 66.991064
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.52 | 81.36 | 82.26 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 15.615176          10000   351.8506       7261.1738     -1602892      
+ 15.872266          10100   352.0531       7267.8043     -1602892      
+ 16.126786          10200   352.16809      7288.176      -1602892      
+ 16.381777          10300   352.67498      7284.0116     -1602892      
+ 16.636303          10400   351.70165      7311.7878     -1602892      
+ 16.894322          10500   352.17236      7345.4689     -1602892      
+ 17.152095          10600   352.39484      7303.0014     -1602892.1    
+ 17.411237          10700   351.92928      7312.2314     -1602892.1    
+ 17.667973          10800   352.33377      7317.3488     -1602892.1    
+ 17.921529          10900   352.14913      7278.4763     -1602892.1    
+ 18.182719          11000   352.82499      7323.0083     -1602892.1    
+Loop time of 245.043 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.886 ns/day, 27.091 hours/ns, 4.081 timesteps/s, 1.487 Matom-step/s
+99.0% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 222.74     | 223.05     | 223.71     |   2.6 | 91.02
+Neigh   | 3.8235     | 3.8422     | 3.8709     |   1.0 |  1.57
+Comm    | 6.2338     | 6.9274     | 7.2338     |  15.6 |  2.83
+Output  | 0.2494     | 0.27177    | 0.29455    |   3.2 |  0.11
+Modify  | 9.4404     | 9.4615     | 9.473      |   0.4 |  3.86
+Other   |            | 1.494      |            |       |  0.61
+
+Nlocal:          91125 ave       91126 max       91124 min
+Histogram: 1 0 0 0 0 2 0 0 0 1
+Nghost:        43074.5 ave       43554 max       42598 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Neighs:    6.10461e+06 ave 6.10555e+06 max 6.10271e+06 min
+Histogram: 1 0 0 0 0 0 0 1 0 2
+
+Total # of neighbors = 24418440
+Ave neighs/atom = 66.991605
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.52 | 81.36 | 82.27 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 18.182719          11000   352.82499      7323.0083     -1602892.1    
+ 18.436701          11100   352.05002      7297.9684     -1602892.1    
+ 18.697614          11200   351.12452      7287.2524     -1602892      
+ 18.952433          11300   353.05773      7342.4822     -1602892.1    
+ 19.203366          11400   352.21434      7339.7514     -1602892.1    
+ 19.463237          11500   352.08318      7315.8476     -1602892.1    
+ 19.713722          11600   352.20026      7359.1449     -1602892      
+ 19.964361          11700   352.1797       7299.8454     -1602892.1    
+ 20.220843          11800   351.1951       7302.0673     -1602892.1    
+ 20.480522          11900   353.07954      7350.1396     -1602892      
+ 20.738196          12000   351.93922      7357.1498     -1602892      
+Loop time of 249.844 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.794 ns/day, 30.221 hours/ns, 4.002 timesteps/s, 1.459 Matom-step/s
+98.7% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 226.24     | 227        | 228.02     |   4.3 | 90.86
+Neigh   | 3.7881     | 3.882      | 3.9485     |   3.0 |  1.55
+Comm    | 6.7753     | 7.7081     | 8.459      |  21.8 |  3.09
+Output  | 0.28577    | 0.31011    | 0.33409    |   3.2 |  0.12
+Modify  | 9.4372     | 9.4473     | 9.4549     |   0.2 |  3.78
+Other   |            | 1.501      |            |       |  0.60
+
+Nlocal:          91125 ave       91126 max       91124 min
+Histogram: 1 0 0 0 0 2 0 0 0 1
+Nghost:        46253.5 ave       46303 max       46209 min
+Histogram: 1 0 0 1 0 1 0 0 0 1
+Neighs:    6.10462e+06 ave 6.10552e+06 max  6.1025e+06 min
+Histogram: 1 0 0 0 0 0 0 0 1 2
+
+Total # of neighbors = 24418489
+Ave neighs/atom = 66.991739
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.52 | 81.36 | 82.28 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 20.738196          12000   351.93922      7357.1498     -1602892      
+ 20.995969          12100   352.65371      7335.5434     -1602892      
+ 21.250307          12200   351.67318      7346.9384     -1602892      
+ 21.509652          12300   352.09077      7316.8746     -1602892      
+ 21.761891          12400   352.53191      7364.4365     -1602892      
+ 22.020834          12500   351.85824      7342.5969     -1602892      
+ 22.277784          12600   352.22592      7360.8395     -1602892      
+ 22.534822          12700   352.54857      7330.7808     -1602892      
+ 22.789046          12800   351.82803      7335.0151     -1602892      
+ 23.045644          12900   351.55512      7348.3597     -1602892      
+ 23.30184           13000   352.52093      7390.2831     -1602892      
+Loop time of 246.044 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.920 ns/day, 26.092 hours/ns, 4.064 timesteps/s, 1.481 Matom-step/s
+99.1% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 223.07     | 223.73     | 224.11     |   2.6 | 90.93
+Neigh   | 3.8081     | 3.8436     | 3.9138     |   2.1 |  1.56
+Comm    | 6.8013     | 7.2329     | 7.901      |  15.2 |  2.94
+Output  | 0.26378    | 0.28624    | 0.30855    |   3.1 |  0.12
+Modify  | 9.4339     | 9.4648     | 9.4879     |   0.6 |  3.85
+Other   |            | 1.491      |            |       |  0.61
+
+Nlocal:          91125 ave       91128 max       91123 min
+Histogram: 2 0 0 0 0 0 1 0 0 1
+Nghost:          45194 ave       45266 max       45151 min
+Histogram: 2 0 0 0 1 0 0 0 0 1
+Neighs:    6.10476e+06 ave 6.10548e+06 max 6.10315e+06 min
+Histogram: 1 0 0 0 0 0 0 0 2 1
+
+Total # of neighbors = 24419055
+Ave neighs/atom = 66.993292
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+No /omp style for force computation currently active
+Per MPI rank memory allocation (min/avg/max) = 80.59 | 81.38 | 82.28 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 23.30184           13000   352.52093      7390.2831     -1602892      
+ 23.557084          13100   352.54889      7382.4987     -1602892      
+ 23.811787          13200   351.57702      7385.8257     -1602892      
+ 24.066372          13300   352.63582      7371.504      -1602892      
+ 24.323366          13400   351.62845      7346.2951     -1602892      
+ 24.582094          13500   352.22929      7354.4094     -1602892      
+ 24.842156          13600   351.90371      7368.7027     -1602892      
+ 25.099076          13700   352.95638      7377.3038     -1602892.1    
+ 25.355526          13800   352.06388      7393.8177     -1602892      
+ 25.611926          13900   351.76513      7380.1262     -1602892      
+ 25.870392          14000   351.94415      7379.2324     -1602892      
+Loop time of 246.84 on 16 procs for 1000 steps with 364500 atoms
+
+Performance: 0.946 ns/day, 25.383 hours/ns, 4.051 timesteps/s, 1.477 Matom-step/s
+99.2% CPU use with 4 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 224.88     | 225.28     | 225.59     |   1.7 | 91.26
+Neigh   | 3.8266     | 3.8499     | 3.8785     |   1.0 |  1.56
+Comm    | 6.2379     | 6.5256     | 6.905      |   9.6 |  2.64
+Output  | 0.23937    | 0.26076    | 0.28264    |   3.2 |  0.11
+Modify  | 9.4359     | 9.4407     | 9.4461     |   0.1 |  3.82
+Other   |            | 1.487      |            |       |  0.60
+
+Nlocal:          91125 ave       91127 max       91123 min
+Histogram: 1 0 1 0 0 0 0 1 0 1
+Nghost:        44919.5 ave       45340 max       44679 min
+Histogram: 1 1 1 0 0 0 0 0 0 1
+Neighs:    6.10461e+06 ave  6.1055e+06 max 6.10323e+06 min
+Histogram: 1 0 0 0 0 0 0 2 0 1
+
+Total # of neighbors = 24418453
+Ave neighs/atom = 66.991641
+Neighbor list builds = 32
+Dangerous builds = 0
+if '$(time)>25' then 'write_data Ni_pka_5keV_final.lmp' 'quit' 
+write_data Ni_pka_5keV_final.lmp
+System init for write_data ...
+No /omp style for force computation currently active
+quit

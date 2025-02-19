@@ -1,0 +1,111 @@
+LAMMPS (2 Aug 2023 - Update 2)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\Ratish Panda\AppData\Local\LAMMPS 64-bit 2Aug2023-MSMPI with Python\plugins
+# 20 ps relaxation (In the same NPT ensemble parameters as the post-irradiation relaxation)
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+set 4 OpenMP thread(s) per MPI task
+using multi-threaded neighbor list subroutines
+
+# Read data file (output from previous steps)
+read_data NiCoCrFe_relaxed.lmp
+Reading data file ...
+  orthogonal box = (0.80381162 0.80381162 0.80381162) to (161.64619 161.64619 161.64619)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  364500 atoms
+  reading velocities ...
+  364500 velocities
+  read_data CPU = 2.866 seconds
+
+# Define potential (EAM potential for Nickel)
+pair_style eam/alloy
+pair_coeff * * FeNiCrCoCu-heafixed.setfl Ni Co Cr Fe
+
+neighbor	 1 bin
+neigh_modify every 1 delay 0 check yes
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.01
+fix 1 all npt temp 300 300 0.8 iso 0 0 1 drag 1
+thermo 100
+thermo_style custom time step temp press etotal
+
+# Relaxation for 20 ps
+run 2000
+No /omp style for force computation currently active
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.80375
+  ghost atom cutoff = 6.80375
+  binsize = 3.401875, bins = 48 48 48
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam/alloy, perpetual
+      attributes: half, newton on, omp
+      pair build: half/bin/atomonly/newton/omp
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 219.9 | 219.9 | 219.9 Mbytes
+     Time         Step          Temp          Press          TotEng    
+ 0                      0   300.1357      -31077.657     -1559897.4    
+ 1                    100   309.67045      35.769681     -1560719.9    
+ 2                    200   307.65633     -227.72104     -1560914.7    
+ 3                    300   305.53304      264.47686     -1561078.8    
+ 4                    400   304.80033     -96.883572     -1561219.3    
+ 5                    500   303.11481      234.66994     -1561331.6    
+ 6                    600   302.32073      112.28596     -1561422      
+ 7                    700   301.98278     -107.07271     -1561495.5    
+ 8                    800   300.55101     -19.686978     -1561550.1    
+ 9                    900   300.29005      91.942815     -1561590.7    
+ 10                  1000   300.08492     -163.77456     -1561619.8    
+ 11                  1100   300.11489     -98.709423     -1561637.4    
+ 12                  1200   300.22379      35.376303     -1561645.6    
+ 13                  1300   299.7869      -155.13273     -1561646.9    
+ 14                  1400   299.71548     -51.864164     -1561647      
+ 15                  1500   300.02552      90.905578     -1561646.4    
+ 16                  1600   299.97938     -31.268208     -1561647.1    
+ 17                  1700   300.24333      159.13454     -1561648.6    
+ 18                  1800   299.97881     -100.24556     -1561647.5    
+ 19                  1900   300.2139      -132.46342     -1561647.5    
+ 20                  2000   299.65443     -24.903057     -1561645.3    
+Loop time of 1717.44 on 4 procs for 2000 steps with 364500 atoms
+
+Performance: 1.006 ns/day, 23.853 hours/ns, 1.165 timesteps/s, 424.469 katom-step/s
+109.1% CPU use with 1 MPI tasks x 4 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1601.1     | 1601.1     | 1601.1     |   0.0 | 93.23
+Neigh   | 56.895     | 56.895     | 56.895     |   0.0 |  3.31
+Comm    | 6.9531     | 6.9531     | 6.9531     |   0.0 |  0.40
+Output  | 0.034143   | 0.034143   | 0.034143   |   0.0 |  0.00
+Modify  | 48.457     | 48.457     | 48.457     |   0.0 |  2.82
+Other   |            | 4.015      |            |       |  0.23
+
+Nlocal:         364500 ave      364500 max      364500 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          91838 ave       91838 max       91838 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:    2.40556e+07 ave 2.40556e+07 max 2.40556e+07 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 24055605
+Ave neighs/atom = 65.996173
+Neighbor list builds = 351
+Dangerous builds = 0
+
+# write output data
+write_data NiCoCrFe_Unirradiated_20ps_Relaxed.lmp
+System init for write_data ...
+No /omp style for force computation currently active
+Total wall time: 0:28:42

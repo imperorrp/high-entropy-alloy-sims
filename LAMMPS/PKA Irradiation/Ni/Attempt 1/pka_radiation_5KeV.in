@@ -1,0 +1,72 @@
+# LAMMPS input script for PKA radiation damage in pure Nickel at 5 keV
+# Establish crystal model, apply 3D PBC, introduce PKA, simulate damage
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Read relaxed data file (output from relaxation)
+read_data Ni_relaxed.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam
+pair_coeff * * Ni_u3.eam
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.001
+thermo 100
+thermo_style custom step temp press etotal
+
+# Apply 3D periodic boundary conditions (already applied by 'read_data')
+# No need for create_box or create_atoms
+
+# Dump settings for atomic configurations (optional)
+# Use if you want to visualize the simulation progress
+dump 1 all custom 1000 Ni_pka_5kev_*.dump id type x y z vx vy vz fx fy fz
+dump_modify 1 sort id
+
+# PKA radiation damage process
+# Define PKA properties
+variable pka_energy equal 5.0  # PKA energy in keV
+variable pka_direction_x equal 0  # PKA direction x-component
+variable pka_direction_y equal 0  # PKA direction y-component
+variable pka_direction_z equal 1  # PKA direction z-component
+
+# Calculate velocity scale
+variable v_scale equal sqrt(${pka_energy}*0.001*2*1.60219e-19/58.6934)
+
+# Loop over multiple PKA simulations
+# Adjust 'run' command based on desired total simulation time
+# In this example, 25 ps relaxation after each PKA introduction
+# Change 'run' command accordingly for your desired simulation length
+# Ensure displacement distance per step is controlled within 0.02 Å as per methodology
+label loop_pka
+variable i loop 3  # Number of repeated experiments for each PKA energy
+variable j loop 1   # Number of PKAs for each energy
+
+# Loop over PKA energies
+label loop_energy
+# Initialize PKA
+create_atoms 1 single ${pka_direction_x} ${pka_direction_y} ${pka_direction_z} units box
+mass 1 58.6934
+
+# Set PKA kinetic energy
+velocity all scale ${v_scale} units box
+
+# Relaxation run in NVE ensemble after PKA introduction
+fix 1 all nve
+run 25000
+
+# Delete PKA
+delete_atoms group all
+
+next j
+jump SELF loop_energy
+
+next i
+jump SELF loop_pka
+
+# Write final configuration after PKA simulations
+write_data Ni_pka_5keV_final.lmp

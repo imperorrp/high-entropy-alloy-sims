@@ -1,0 +1,104 @@
+LAMMPS (2 Aug 2023 - Update 2)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Loaded 1 plugins from C:\Users\Ratish Panda\AppData\Local\LAMMPS 64-bit 2Aug2023\plugins
+# LAMMPS input script for PKA radiation damage in pure Nickel at 5 keV
+# Establish crystal model, apply 3D PBC, introduce PKA, simulate damage
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Specify the number of OpenMP threads
+package omp 4
+set 4 OpenMP thread(s) per MPI task
+using multi-threaded neighbor list subroutines
+
+# Read relaxed data file (output from relaxation)
+read_data Ni_relaxed.lmp
+Reading data file ...
+  orthogonal box = (-0.013463769 -0.013463769 -0.013463769) to (158.41346 158.41346 158.41346)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  364500 atoms
+  reading velocities ...
+  364500 velocities
+  read_data CPU = 3.349 seconds
+
+# Define potential (EAM potential for Nickel)
+pair_style eam
+pair_coeff * * Ni_u3.eam
+Reading eam potential file Ni_u3.eam with DATE: 2007-06-11
+
+# Define relaxation parameters
+reset_timestep 0
+thermo 100
+thermo_style custom step temp press etotal
+
+# Apply 3D periodic boundary conditions (already applied by 'read_data')
+# No need for create_box or create_atoms
+
+# Dump settings for atomic configurations (optional)
+# Use if you want to visualize the simulation progress
+dump 1 all custom 100 Ni_pka_5kev_*.dump id type x y z vx vy vz fx fy fz
+dump_modify 1 sort id
+
+# PKA radiation damage process
+# Define PKA properties
+variable pka_energy equal 5.0  # PKA energy in keV
+variable pka_direction_x equal 0  # PKA direction x-component
+variable pka_direction_y equal 0  # PKA direction y-component
+variable pka_direction_z equal 1  # PKA direction z-component
+
+# Calculate center of the simulation cell
+variable cell_center_x equal lx/2
+variable cell_center_y equal ly/2
+variable cell_center_z equal lz/2
+
+# Define radius for selecting recoil atom
+variable radius equal 1.0 # This selects exactly one center atom
+
+# Pick a random atom near the center as the recoil atom
+region center_sphere sphere ${cell_center_x} ${cell_center_y} ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 ${cell_center_y} ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 ${cell_center_z} ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 79.2134637691141 ${radius}
+region center_sphere sphere 79.2134637691141 79.2134637691141 79.2134637691141 1
+
+# Create a group of atoms within the defined region
+group center_atom region center_sphere
+1 atoms in group center_atom
+
+# Set PKA velocity to 1282 angstroms per picosecond in specified direction
+variable pka_velocity equal 1282.0
+velocity center_atom set 0 0 ${pka_velocity} units box
+velocity center_atom set 0 0 1282 units box
+
+# Relaxation run in NVE ensemble after PKA introduction
+fix 1 all nve
+timestep 0.0005
+run 1000
+No /omp style for force computation currently active
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.8
+  ghost atom cutoff = 6.8
+  binsize = 3.4, bins = 47 47 47
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam, perpetual
+      attributes: half, newton on, omp
+      pair build: half/bin/atomonly/newton/omp
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 227.8 | 227.8 | 227.8 Mbytes
+   Step          Temp          Press          TotEng    
+         0   406.12794      4220.4002     -1602889.2    
+       100   203953.3       2581429.1      7988929.3    
+       200   236291.49      2997976.4      9522907.9    
+       300   12569255       1.5912442e+08  5.9065483e+08
+       400   16345540       2.0712059e+08  7.6887308e+08
+       500   30013318       3.8088521e+08  1.4139628e+09
+ERROR: Lost atoms: original 364500 current 364498 (src/thermo.cpp:488)
+Last command: run 1000

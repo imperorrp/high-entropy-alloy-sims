@@ -1,0 +1,31 @@
+# LAMMPS input script for relaxation of FCC Nickel crystal with 3D PBC and NPT ensemble
+# Includes periodic dumping of atomic configurations
+
+# Initialize
+units metal
+boundary p p p
+atom_style atomic
+
+# Read data file
+read_data Ni_crystal.lmp
+
+# Define potential (EAM potential for Nickel)
+pair_style eam
+pair_coeff * * Ni_u3.eam
+
+# Define relaxation parameters
+reset_timestep 0
+timestep 0.001
+thermo 100
+thermo_style custom step temp press etotal
+
+# Dump settings for atomic configurations
+dump 1 all custom 1000 Ni_relaxed_*.dump id type x y z vx vy vz fx fy fz
+dump_modify 1 sort id
+
+# Relaxation run in NPT ensemble for 100 ps
+fix 1 all npt temp 300 300 0.1 iso 0.0 0.0 1000.0 drag 1.0
+run 100000
+
+# Write relaxed structure
+write_data Ni_relaxed.lmp
